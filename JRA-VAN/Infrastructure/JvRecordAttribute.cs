@@ -3,18 +3,18 @@ using System;
 namespace JRA_VAN.Infrastructure
 {
     /// <summary>
-    /// Indicates that the property maps to a field in a JV-Link record.
+    /// プロパティがJV-Linkレコードのフィールドに対応することを示します。
     /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
     public class JvFieldAttribute : Attribute
     {
         /// <summary>
-        /// The byte offset (0-based) where the field starts.
+        /// フィールドの開始バイトオフセット (0始まり)
         /// </summary>
         public int Offset { get; }
 
         /// <summary>
-        /// The length of the field in bytes.
+        /// フィールドのバイト長
         /// </summary>
         public int Length { get; }
 

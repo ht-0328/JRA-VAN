@@ -3,41 +3,41 @@ using JRA_VAN.Infrastructure;
 namespace JRA_VAN.Models
 {
     /// <summary>
-    /// Represents a "Sokuho Race Info" (RA) record.
+    /// 速報レース情報 (レコード種別: RA) を表すクラス。
     /// </summary>
     public class RaRecord
     {
         /// <summary>
         /// 開催年 (Year)
-        /// Offset: 11, Length: 4
+        /// オフセット: 11, 長さ: 4
         /// </summary>
         [JvField(11, 4)]
         public string Year { get; set; } = string.Empty;
 
         /// <summary>
         /// 開催月日 (MonthDay)
-        /// Offset: 15, Length: 4
+        /// オフセット: 15, 長さ: 4
         /// </summary>
         [JvField(15, 4)]
         public string MonthDay { get; set; } = string.Empty;
 
         /// <summary>
         /// 競馬場コード (Course Code)
-        /// Offset: 19, Length: 2
+        /// オフセット: 19, 長さ: 2
         /// </summary>
         [JvField(19, 2)]
         public string CourseCode { get; set; } = string.Empty;
 
         /// <summary>
         /// レース番号 (Race Number)
-        /// Offset: 25, Length: 2
+        /// オフセット: 25, 長さ: 2
         /// </summary>
         [JvField(25, 2)]
         public string RaceNumber { get; set; } = string.Empty;
 
         /// <summary>
         /// レース名 (Race Name)
-        /// Offset: 33, Length: 60
+        /// オフセット: 33, 長さ: 60
         /// </summary>
         [JvField(33, 60)]
         public string RaceName { get; set; } = string.Empty;

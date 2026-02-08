@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 namespace JRA_VAN.Infrastructure
 {
+    /// <summary>
+    /// JV-Linkコンポーネントの操作をカプセル化するクライアントクラス。
+    /// </summary>
     public class JraVanClient : IDisposable
     {
         private readonly JVLink _jvLink;
@@ -17,9 +20,9 @@ namespace JRA_VAN.Infrastructure
         }
 
         /// <summary>
-        /// Initializes the JV-Link component.
+        /// JV-Linkコンポーネントを初期化します。
         /// </summary>
-        /// <param name="sid">Service ID (usually "UNKNOWN" for default or specific ID)</param>
+        /// <param name="sid">サービスID (通常は "UNKNOWN" または特定のID)</param>
         public void Initialize(string sid)
         {
             int result = _jvLink.JVInit(sid);
@@ -30,14 +33,14 @@ namespace JRA_VAN.Infrastructure
         }
 
         /// <summary>
-        /// Retrieves records matching the specified criteria.
-        /// Handles JVOpen, JVGets, and JVClose automatically.
+        /// 指定された条件に一致するレコードを取得します。
+        /// JVOpen, JVGets, JVClose の呼び出しフローを自動化します。
         /// </summary>
-        /// <typeparam name="T">The type of record to map to.</typeparam>
-        /// <param name="dataSpec">Data specification (e.g., "RACE")</param>
-        /// <param name="key">Key for retrieval (e.g., "20260101000000")</param>
-        /// <param name="option">Option (e.g., 1)</param>
-        /// <returns>An enumerable of mapped records.</returns>
+        /// <typeparam name="T">マッピング対象のレコード型</typeparam>
+        /// <param name="dataSpec">データ種別 (例: "RACE")</param>
+        /// <param name="key">データ取得キー (例: "20260101000000")</param>
+        /// <param name="option">オプション値 (例: 1)</param>
+        /// <returns>マッピングされたレコードの列挙子</returns>
         public IEnumerable<T> GetRecords<T>(string dataSpec, string key, int option) where T : new()
         {
             int readCount = 0;
@@ -50,10 +53,10 @@ namespace JRA_VAN.Infrastructure
                 throw new JraVanException($"JVOpen failed with return code: {openResult}");
             }
 
-            // Using try-finally to ensure JVClose is called
+            // try-finallyブロックで確実にJVCloseが呼ばれるようにする
             try
             {
-                byte[] buffer = new byte[102400]; // Standard buffer size
+                byte[] buffer = new byte[102400]; // 標準的なバッファサイズ
                 int buffSize = buffer.Length;
                 string filename = "";
 
@@ -62,21 +65,21 @@ namespace JRA_VAN.Infrastructure
                     object buffObj = buffer;
                     int readResult = _jvLink.JVGets(ref buffObj, buffSize, out filename);
 
-                    if (readResult == 0) break; // End of file
+                    if (readResult == 0) break; // 読み込み完了
                     if (readResult < 0)
                     {
-                         // Treat negative values as error
+                         // 負の値はエラーとして扱う
                          throw new JraVanException($"JVGets failed with return code: {readResult}");
                     }
 
-                    // readResult is the number of bytes read.
-                    // Create a slice of the valid data.
+                    // readResult は読み込まれたバイト数
+                    // 有効なデータ範囲を切り出す
                     byte[] recordBytes = new byte[readResult];
                     Array.Copy((byte[])buffObj, recordBytes, readResult);
 
                     yield return _mapper.Map<T>(recordBytes);
 
-                    // Clear buffer for next read
+                    // 次の読み込みのためにバッファをクリア
                     Array.Clear(buffer, 0, buffer.Length);
                 }
             }
@@ -98,20 +101,17 @@ namespace JRA_VAN.Infrastructure
             {
                 if (disposing)
                 {
-                    // Call JVClose if not already closed?
-                    // JVClose is safe to call multiple times? Assuming yes or handled in GetRecords.
-                    // But if Initialize was called but GetRecords wasn't, we might not need to close anything
-                    // except the session if JVInit opens one?
-                    // JVLink documentation usually says JVClose closes the *data reading session*.
-                    // JVInit doesn't need a close usually, but JVLink object disposal handles cleanup.
-                    // We can just rely on GC or explicit Close if needed.
+                    // JVCloseを呼び出す必要があるか確認
+                    // 通常、JVLinkの仕様ではJVCloseはデータ読み出しセッションを閉じるもの。
+                    // JVInit後のセッション終了処理はデストラクタ等に任せるか、明示的なCloseが必要か仕様による。
+                    // ここでは念のため例外を無視してCloseを試みる。
                     try
                     {
                         _jvLink.JVClose();
                     }
                     catch
                     {
-                        // Ignore errors during dispose
+                        // 破棄時のエラーは無視
                     }
                 }
                 _disposed = true;
@@ -119,6 +119,9 @@ namespace JRA_VAN.Infrastructure
         }
     }
 
+    /// <summary>
+    /// JRA-VAN操作に関連するカスタム例外クラス
+    /// </summary>
     public class JraVanException : Exception
     {
         public JraVanException(string message) : base(message) { }
