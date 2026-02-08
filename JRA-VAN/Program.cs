@@ -34,10 +34,10 @@ class Program
                 string key = "20240101000000";
                 int option = 1; // 通常読み込み
 
-                Console.WriteLine($"{key} 以降の {dataSpec} データから RA レコードを取得中...");
+                Console.WriteLine($"{key} 以降の {dataSpec} データから SE レコード（馬毎レース情報）を取得中...");
 
-                // JraVanClient内部で RaRecord の [JvRecordSpec("RA")] 属性を見てフィルタリングします
-                var records = client.GetRecords<RaRecord>(dataSpec, key, option);
+                // JraVanClient内部で SeRecord の [JvRecordSpec("SE")] 属性を見てフィルタリングします
+                var records = client.GetRecords<SeRecord>(dataSpec, key, option);
                 int count = 0;
 
                 foreach (var record in records)
@@ -79,7 +79,7 @@ class Program
         try
         {
             // レコードを模したダミーのバイト配列を作成
-            // 最大オフセット+長さ (33+60=93) を収容できるサイズ
+            // 最大オフセット+長さ (37+36=73) を収容できるサイズ
             byte[] data = new byte[100];
             Encoding sjis = Encoding.GetEncoding("Shift_JIS");
 
@@ -90,34 +90,27 @@ class Program
                 Array.Copy(b, 0, data, offset, b.Length);
             }
 
-            // RecordID (先頭2バイト) をセット
-            Write(0, "RA");
+            // RecordID (先頭2バイト) をセット (SE: 馬毎レース情報)
+            Write(0, "SE");
 
-            // RaRecordの仕様に従ってデータを埋める
-            // 年: 11, 4
-            Write(11, "2024");
-            // 月日: 15, 4
-            Write(15, "0526"); // 5月26日
-            // 競馬場コード: 19, 2
-            Write(19, "05"); // 東京?
+            // SeRecordの仕様に従ってデータを埋める
+            // 開催年月日: 11, 8
+            Write(11, "20240526");
             // レース番号: 25, 2
             Write(25, "11"); // 11R
-            // レース名: 33, 60
-            Write(33, "日本ダービー (G1)");
+            // 馬名: 37, 36
+            Write(37, "ダノンデサイル"); // 日本ダービー馬
 
             // マッピングのテスト
             var mapper = new JvRecordMapper();
-            var record = mapper.Map<RaRecord>(data);
+            var record = mapper.Map<SeRecord>(data);
 
             Console.WriteLine($"マップ結果: {record}");
 
             // 検証 (アサーション)
-            if (record.Year != "2024") throw new Exception($"年の不一致: {record.Year}");
-            if (record.MonthDay != "0526") throw new Exception($"月日の不一致: {record.MonthDay}");
-            if (record.CourseCode != "05") throw new Exception($"競馬場コードの不一致: {record.CourseCode}");
+            if (record.RaceDate != "20240526") throw new Exception($"開催年月日の不一致: {record.RaceDate}");
             if (record.RaceNumber != "11") throw new Exception($"レース番号の不一致: {record.RaceNumber}");
-            // Shift-JISの日本語文字列が正しく扱えるかもチェック
-            if (record.RaceName != "日本ダービー (G1)") throw new Exception($"レース名の不一致: {record.RaceName}");
+            if (record.HorseName != "ダノンデサイル") throw new Exception($"馬名の不一致: {record.HorseName}");
 
             Console.WriteLine("検証成功！");
         }
