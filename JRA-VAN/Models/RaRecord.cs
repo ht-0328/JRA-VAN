@@ -5,6 +5,7 @@ namespace JRA_VAN.Models
     /// <summary>
     /// 速報レース情報 (レコード種別: RA) を表すクラス。
     /// </summary>
+    [JvRecordSpec("RA")]
     public class RaRecord
     {
         /// <summary>

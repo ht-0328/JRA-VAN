@@ -1,6 +1,8 @@
 using JVDTLabLib;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
 
 namespace JRA_VAN.Infrastructure
 {
@@ -35,6 +37,7 @@ namespace JRA_VAN.Infrastructure
         /// <summary>
         /// 指定された条件に一致するレコードを取得します。
         /// JVOpen, JVGets, JVClose の呼び出しフローを自動化します。
+        /// T型に JvRecordSpecAttribute が付与されている場合、対応するレコードIDでフィルタリングします。
         /// </summary>
         /// <typeparam name="T">マッピング対象のレコード型</typeparam>
         /// <param name="dataSpec">データ種別 (例: "RACE")</param>
@@ -53,12 +56,23 @@ namespace JRA_VAN.Infrastructure
                 throw new JraVanException($"JVOpen failed with return code: {openResult}");
             }
 
+            // マッピング対象のレコードIDを取得
+            string? targetRecordId = null;
+            var recordSpecAttr = typeof(T).GetCustomAttribute<JvRecordSpecAttribute>();
+            if (recordSpecAttr != null)
+            {
+                targetRecordId = recordSpecAttr.RecordId;
+            }
+
             // try-finallyブロックで確実にJVCloseが呼ばれるようにする
             try
             {
                 byte[] buffer = new byte[102400]; // 標準的なバッファサイズ
                 int buffSize = buffer.Length;
                 string filename = "";
+
+                // レコードIDチェック用のエンコーディング (ASCII/Shift-JIS共通の範囲)
+                var encoding = Encoding.GetEncoding("Shift_JIS");
 
                 while (true)
                 {
@@ -76,6 +90,22 @@ namespace JRA_VAN.Infrastructure
                     // 有効なデータ範囲を切り出す
                     byte[] recordBytes = new byte[readResult];
                     Array.Copy((byte[])buffObj, recordBytes, readResult);
+
+                    // レコードIDによるフィルタリング
+                    if (!string.IsNullOrEmpty(targetRecordId))
+                    {
+                        // 通常、レコードIDは先頭2バイト
+                        if (recordBytes.Length >= 2)
+                        {
+                            string recordId = encoding.GetString(recordBytes, 0, 2);
+                            if (recordId != targetRecordId)
+                            {
+                                // 対象外のレコードなのでスキップ
+                                Array.Clear(buffer, 0, buffer.Length);
+                                continue;
+                            }
+                        }
+                    }
 
                     yield return _mapper.Map<T>(recordBytes);
 
@@ -102,9 +132,6 @@ namespace JRA_VAN.Infrastructure
                 if (disposing)
                 {
                     // JVCloseを呼び出す必要があるか確認
-                    // 通常、JVLinkの仕様ではJVCloseはデータ読み出しセッションを閉じるもの。
-                    // JVInit後のセッション終了処理はデストラクタ等に任せるか、明示的なCloseが必要か仕様による。
-                    // ここでは念のため例外を無視してCloseを試みる。
                     try
                     {
                         _jvLink.JVClose();

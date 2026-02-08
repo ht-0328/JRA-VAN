@@ -28,14 +28,16 @@ class Program
                 client.Initialize("UNKNOWN");
 
                 // 2. データ取得
-                // 例: 特定の開始時点から速報レース情報 (RA) を取得
-                string targetSpec = "RA";
+                // 注意: JVOpenの第一引数はデータ種別（"RACE"）を指定する必要があります。
+                // "RA" などのレコードIDを直接指定するとエラー (-111) になります。
+                string dataSpec = "RACE"; // データ種別: レース情報 (RA, SE, UM などが含まれる)
                 string key = "20240101000000";
                 int option = 1; // 通常読み込み
 
-                Console.WriteLine($"{key} 以降の {targetSpec} レコードを取得中...");
+                Console.WriteLine($"{key} 以降の {dataSpec} データから RA レコードを取得中...");
 
-                var records = client.GetRecords<RaRecord>(targetSpec, key, option);
+                // JraVanClient内部で RaRecord の [JvRecordSpec("RA")] 属性を見てフィルタリングします
+                var records = client.GetRecords<RaRecord>(dataSpec, key, option);
                 int count = 0;
 
                 foreach (var record in records)
@@ -87,6 +89,9 @@ class Program
                 byte[] b = sjis.GetBytes(value);
                 Array.Copy(b, 0, data, offset, b.Length);
             }
+
+            // RecordID (先頭2バイト) をセット
+            Write(0, "RA");
 
             // RaRecordの仕様に従ってデータを埋める
             // 年: 11, 4
