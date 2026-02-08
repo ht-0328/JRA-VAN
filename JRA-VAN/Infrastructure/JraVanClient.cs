@@ -72,7 +72,6 @@ namespace JRA_VAN.Infrastructure
             {
                 // 仕様に従い、十分なバッファサイズを確保する
                 byte[] buffer = new byte[BufferSize];
-                int buffSize = BufferSize;
                 string filename = "";
 
                 // レコードIDチェック用のエンコーディング (ASCII/Shift-JIS共通の範囲)
@@ -81,7 +80,8 @@ namespace JRA_VAN.Infrastructure
                 while (true)
                 {
                     object buffObj = buffer;
-                    int readResult = _jvLink.JVGets(ref buffObj, buffSize, out filename);
+                    // バッファサイズは必ず BufferSize (102400) を渡す
+                    int readResult = _jvLink.JVGets(ref buffObj, BufferSize, out filename);
 
                     if (readResult == 0) break; // 読み込み完了
                     if (readResult < 0)
