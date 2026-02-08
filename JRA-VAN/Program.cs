@@ -1,89 +1,125 @@
-﻿using JVDTLabLib;
+using JRA_VAN.Infrastructure;
+using JRA_VAN.Models;
+using System;
 using System.Text;
 
-// 文字化け対策
-Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-Console.WriteLine("データ取得と解読を開始します...");
-
-try
+class Program
 {
-    JVLink jv = new JVLink();
-
-    // 1. 初期化
-    if (jv.JVInit("UNKNOWN") != 0)
+    static void Main(string[] args)
     {
-        Console.WriteLine("初期化エラー");
-        return;
-    }
+        // Ensure Shift-JIS is available
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-    // 2. データの読み出し開始
-    int readCount = 0;
-    int downloadCount = 0;
-    string lastTimestamp = "";
-
-    // オプション1 (通常読み込み)
-    // ※ JG1データ（除外・発走除外・競走中止などの馬情報）を取得します
-    int openResult = jv.JVOpen("RACE", "20260101000000", 1, ref readCount, ref downloadCount, out lastTimestamp);
-
-    if (openResult == 0)
-    {
-        Console.WriteLine($"読み込み準備完了！ 対象件数: {readCount}件");
-        Console.WriteLine("--------------------------------------------------");
-
-        // バイト配列を用意（メモリ破損防止のため必須）
-        byte[] byteBuffer = new byte[102400];
-        int buffSize = byteBuffer.Length;
-        string fName = "";
-
-        // Shift-JISエンコーディングの準備
-        Encoding sjis = Encoding.GetEncoding("Shift_JIS");
-
-        while (true)
+        // Verification mode for testing without COM
+        if (args.Length > 0 && args[0] == "verify")
         {
-            // JVGetsには object型 として渡す
-            object buffObj = byteBuffer;
-
-            // データの読み込み
-            int readResult = jv.JVGets(ref buffObj, buffSize, out fName);
-
-            if (readResult == 0) break; // 完了
-            if (readResult == -1) break; // エラー
-
-            // object型に入っているバイト配列を取り出す
-            byte[] rawBytes = (byte[])buffObj;
-
-            // --- ここから解読処理 (JG1レコードの仕様に合わせて切り抜く) ---
-
-            // 1. 開催日 (11バイト目から8文字)
-            string raceDate = sjis.GetString(rawBytes, 11, 8);
-
-            // 2. レース番号 (25バイト目から2文字) 
-            // ※仕様書上の位置は25バイト目
-            string raceNum = sjis.GetString(rawBytes, 25, 2);
-
-            // 3. 馬名 (37バイト目から36文字分)
-            string horseName = sjis.GetString(rawBytes, 37, 36).Trim();
-
-            // 画面にきれいに表示
-            Console.WriteLine($"開催日: {raceDate} | {raceNum}R | 馬名: {horseName}");
-
-            // --- 解読ここまで ---
-
-            // 次のループのために配列をクリア
-            Array.Clear(byteBuffer, 0, byteBuffer.Length);
+            VerifyMapper();
+            return;
         }
 
-        Console.WriteLine("--------------------------------------------------");
-        Console.WriteLine("【完了】正常に終了しました。");
-        jv.JVClose();
+        Console.WriteLine("Data acquisition and parsing started...");
+
+        try
+        {
+            // Note: This will throw on environments where JVDTLabLib COM is not registered (e.g., Linux CI)
+            using (var client = new JraVanClient())
+            {
+                // 1. Initialize
+                client.Initialize("UNKNOWN");
+
+                // 2. Retrieve Data
+                // Example: Fetch "RA" (Sokuho Race Info) from a specific starting point.
+                // Adjust the key (timestamp) as needed.
+                string targetSpec = "RA";
+                string key = "20240101000000";
+                int option = 1; // Standard
+
+                Console.WriteLine($"Fetching {targetSpec} records since {key}...");
+
+                var records = client.GetRecords<RaRecord>(targetSpec, key, option);
+                int count = 0;
+
+                foreach (var record in records)
+                {
+                    Console.WriteLine(record.ToString());
+                    count++;
+                }
+
+                Console.WriteLine($"--------------------------------------------------");
+                Console.WriteLine($"Total Records Processed: {count}");
+            }
+        }
+        catch (JraVanException ex)
+        {
+            Console.WriteLine($"[JRA-VAN Error] {ex.Message}");
+        }
+        catch (TypeInitializationException ex)
+        {
+            Console.WriteLine($"[COM Error] Could not initialize COM component. This app requires JRA-VAN JV-Link installed on Windows.");
+            Console.WriteLine($"Details: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Error] {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
+
+        Console.WriteLine("Press any key to exit...");
+        // Console.ReadKey(); // Commented out for non-interactive environments
     }
-    else
+
+    /// <summary>
+    /// Verifies the mapping logic without requiring the COM component.
+    /// </summary>
+    static void VerifyMapper()
     {
-        Console.WriteLine($"JVOpenエラー: {openResult}");
+        Console.WriteLine("Running Mapper Verification...");
+
+        try
+        {
+            // Create a dummy byte array simulating a record
+            // Size needs to accommodate the largest offset+length (33+60 = 93)
+            byte[] data = new byte[100];
+            Encoding sjis = Encoding.GetEncoding("Shift_JIS");
+
+            // Helper to write string at offset
+            void Write(int offset, string value)
+            {
+                byte[] b = sjis.GetBytes(value);
+                Array.Copy(b, 0, data, offset, b.Length);
+            }
+
+            // Fill data according to RaRecord spec
+            // Year: 11, 4
+            Write(11, "2024");
+            // MonthDay: 15, 4
+            Write(15, "0526"); // May 26th
+            // Course: 19, 2
+            Write(19, "05"); // Tokyo?
+            // RaceNum: 25, 2
+            Write(25, "11"); // 11R
+            // RaceName: 33, 60
+            Write(33, "Japanese Derby (G1)");
+
+            // Test Mapping
+            var mapper = new JvRecordMapper();
+            var record = mapper.Map<RaRecord>(data);
+
+            Console.WriteLine($"Mapped: {record}");
+
+            // Assertions
+            if (record.Year != "2024") throw new Exception($"Year mismatch: {record.Year}");
+            if (record.MonthDay != "0526") throw new Exception($"MonthDay mismatch: {record.MonthDay}");
+            if (record.CourseCode != "05") throw new Exception($"CourseCode mismatch: {record.CourseCode}");
+            if (record.RaceNumber != "11") throw new Exception($"RaceNumber mismatch: {record.RaceNumber}");
+            if (record.RaceName != "Japanese Derby (G1)") throw new Exception($"RaceName mismatch: {record.RaceName}");
+
+            Console.WriteLine("VERIFICATION PASSED!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"VERIFICATION FAILED: {ex.Message}");
+            Environment.Exit(1);
+        }
     }
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"例外エラー: {ex.Message}");
 }
