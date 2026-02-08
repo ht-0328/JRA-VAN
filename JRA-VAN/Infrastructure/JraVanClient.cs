@@ -11,6 +11,9 @@ namespace JRA_VAN.Infrastructure
     /// </summary>
     public class JraVanClient : IDisposable
     {
+        // JV-Link仕様に基づくバッファサイズ (100KB)
+        private const int BufferSize = 102400;
+
         private readonly JVLink _jvLink;
         private readonly JvRecordMapper _mapper;
         private bool _disposed;
@@ -67,8 +70,9 @@ namespace JRA_VAN.Infrastructure
             // try-finallyブロックで確実にJVCloseが呼ばれるようにする
             try
             {
-                byte[] buffer = new byte[102400]; // 標準的なバッファサイズ
-                int buffSize = buffer.Length;
+                // 仕様に従い、十分なバッファサイズを確保する
+                byte[] buffer = new byte[BufferSize];
+                int buffSize = BufferSize;
                 string filename = "";
 
                 // レコードIDチェック用のエンコーディング (ASCII/Shift-JIS共通の範囲)
