@@ -3,6 +3,15 @@ using JRA_VAN.Models;
 using System;
 using System.Text;
 
+// ファイルスコープ名前空間はトップレベルステートメントと併用できないため、
+// Programクラスを使用する形に統一するか、トップレベルステートメントにするかですが、
+// 既存コードがProgramクラスベースだったので、それを維持しつつモダンな記述にします。
+// ただし、トップレベルステートメントの方がよりモダンですが、
+// ここではリファクタリングの範囲を「記述の整理」に留めます。
+// 検証モードなどのstaticメソッドを持つ構造上、Programクラスがあったほうが収まりが良い場合もあります。
+
+namespace JRA_VAN;
+
 class Program
 {
     static void Main(string[] args)
@@ -21,34 +30,7 @@ class Program
 
         try
         {
-            // 注意: JVDTLabLib COMが登録されていない環境（例: Linux CI）では例外が発生します
-            using (var client = new JraVanClient())
-            {
-                // 1. 初期化
-                client.Initialize("UNKNOWN");
-
-                // 2. データ取得
-                // 注意: JVOpenの第一引数はデータ種別（"RACE"）を指定する必要があります。
-                // "RA" などのレコードIDを直接指定するとエラー (-111) になります。
-                string dataSpec = "RACE"; // データ種別: レース情報 (RA, SE, UM などが含まれる)
-                string key = "20240101000000";
-                int option = 1; // 通常読み込み
-
-                Console.WriteLine($"{key} 以降の {dataSpec} データから SE レコード（馬毎レース情報）を取得中...");
-
-                // JraVanClient内部で SeRecord の [JvRecordSpec("SE")] 属性を見てフィルタリングします
-                var records = client.GetRecords<SeRecord>(dataSpec, key, option);
-                int count = 0;
-
-                foreach (var record in records)
-                {
-                    Console.WriteLine(record.ToString());
-                    count++;
-                }
-
-                Console.WriteLine($"--------------------------------------------------");
-                Console.WriteLine($"処理済みレコード総数: {count}");
-            }
+            RunJraVanProcess();
         }
         catch (JraVanException ex)
         {
@@ -70,6 +52,40 @@ class Program
     }
 
     /// <summary>
+    /// JRA-VANデータ取得のメインプロセスを実行します。
+    /// </summary>
+    static void RunJraVanProcess()
+    {
+        // 注意: JVDTLabLib COMが登録されていない環境（例: Linux CI）では例外が発生します
+        using var client = new JraVanClient();
+
+        // 1. 初期化
+        client.Initialize("UNKNOWN");
+
+        // 2. データ取得
+        // 注意: JVOpenの第一引数はデータ種別（"RACE"）を指定する必要があります。
+        // "RA" などのレコードIDを直接指定するとエラー (-111) になります。
+        var dataSpec = "RACE"; // データ種別: レース情報 (RA, SE, UM などが含まれる)
+        var key = "20240101000000";
+        var option = 1; // 通常読み込み
+
+        Console.WriteLine($"{key} 以降の {dataSpec} データから SE レコード（馬毎レース情報）を取得中...");
+
+        // JraVanClient内部で SeRecord の [JvRecordSpec("SE")] 属性を見てフィルタリングします
+        var records = client.GetRecords<SeRecord>(dataSpec, key, option);
+        var count = 0;
+
+        foreach (var record in records)
+        {
+            Console.WriteLine(record.ToString());
+            count++;
+        }
+
+        Console.WriteLine($"--------------------------------------------------");
+        Console.WriteLine($"処理済みレコード総数: {count}");
+    }
+
+    /// <summary>
     /// COMコンポーネントを使用せずにマッピングロジックを検証します。
     /// </summary>
     static void VerifyMapper()
@@ -80,13 +96,13 @@ class Program
         {
             // レコードを模したダミーのバイト配列を作成
             // 最大オフセット+長さ (37+36=73) を収容できるサイズ
-            byte[] data = new byte[100];
-            Encoding sjis = Encoding.GetEncoding("Shift_JIS");
+            var data = new byte[100];
+            var sjis = Encoding.GetEncoding("Shift_JIS");
 
             // 指定したオフセットに文字列を書き込むヘルパー関数
             void Write(int offset, string value)
             {
-                byte[] b = sjis.GetBytes(value);
+                var b = sjis.GetBytes(value);
                 Array.Copy(b, 0, data, offset, b.Length);
             }
 
