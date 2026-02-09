@@ -10,18 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <COMReference Include="JVDTLabLib">
-      <WrapperTool>tlbimp</WrapperTool>
-      <VersionMinor>18</VersionMinor>
-      <VersionMajor>1</VersionMajor>
-      <Guid>2ab17740-0c41-11d7-916f-0003479beb3f</Guid>
-      <Lcid>0</Lcid>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
