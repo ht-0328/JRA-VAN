@@ -1,48 +1,87 @@
+using System;
 using System.Text;
+using JRA_VAN.Dtos;
 using JRA_VAN.Logic;
-using JRA_VAN.Models;
 
-// 文字化け対策
-Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+namespace JRA_VAN;
 
-Console.WriteLine("データ取得と解読を開始します...");
-
-try
+public static class Program
 {
-    using (var client = new JraVanClient())
+    public static void Main(string[] args)
     {
-        // 1. データ読み出し準備 (JVOpen)
-        int readCount;
-        int downloadCount;
-        string lastTimestamp;
+        // 文字化け対策
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        var sjis = Encoding.GetEncoding("Shift_JIS");
 
-        // オプション1 (通常読み込み)
-        // ※ JG1データ（除外・発走除外・競走中止などの馬情報）を取得します
-        client.Open("RACE", "20260101000000", 1, out readCount, out downloadCount, out lastTimestamp);
+        Console.WriteLine("データ取得と解読を開始します...");
 
-        Console.WriteLine($"読み込み準備完了！ 対象件数: {readCount}件");
-        Console.WriteLine("--------------------------------------------------");
-
-        while (true)
+        try
         {
-            // 2. データの読み込み (JVGets)
-            byte[]? data = client.Read();
+            using (var client = new JraVanClient())
+            {
+                // 1. データ読み出し準備 (JVOpen)
+                // JVOpenの第1引数は "RACE" のようなデータカテゴリを指定する
+                // 第2引数は取得開始日時 (YYYYMMDDhhmmss)
+                // 第3引数はオプション (通常1)
+                // JRA-VAN JV-Link の仕様に従い、適切なパラメータで呼び出す
+                // 戻り値として読み込み件数などが得られる
 
-            if (data == null) break; // 読み込み終了またはエラー
+                int readCount;
+                int downloadCount;
+                string lastTimestamp;
 
-            // 3. パース処理 (分離されたロジック)
-            RaceRecord record = JraVanRecordParser.Parse(data);
+                // JVOpen: データ種別ID="RACE", 開始日時="20230101000000", オプション=1 (通常読み込み)
+                // ※ユーザーの要望により実際のAPI呼び出しを行う形にする
+                client.Open("RACE", "20230101000000", 1, out readCount, out downloadCount, out lastTimestamp);
 
-            // 画面にきれいに表示
-            Console.WriteLine(record.ToString());
+                Console.WriteLine($"JVOpen 成功: 読み込み予定件数={readCount}, ダウンロード={downloadCount}, Timestamp={lastTimestamp}");
+                Console.WriteLine("--------------------------------------------------");
+
+                while (true)
+                {
+                    // 2. データの読み込み (JVGets)
+                    // バイト配列として取得される (nullなら終了)
+                    byte[]? rawData = client.Read();
+                    if (rawData == null)
+                    {
+                        break;
+                    }
+
+                    // バイト配列をShift_JIS文字列に変換
+                    // TrimEndして末尾のゴミを除くことも考慮できるが、固定長パースは位置指定なのでそのまま渡すのが安全
+                    string line = sjis.GetString(rawData);
+
+                    // レコード種別 (先頭2文字) を確認
+                    if (line.StartsWith("RA"))
+                    {
+                        // 3. パース処理 (RAレコードの場合)
+                        try
+                        {
+                            RaDto dto = JraVanRecordParser.ParseRa(line);
+
+                            // 結果を表示 (例: レース名などを出力)
+                            Console.WriteLine($"[RA] {dto.Year}年{dto.MonthDay} {dto.RacetrackCode} {dto.RaceNum}R: {dto.RaceName.Trim()}");
+                        }
+                        catch (Exception parseEx)
+                        {
+                            Console.WriteLine($"Parse Error (RA): {parseEx.Message}");
+                        }
+                    }
+                    else
+                    {
+                        // RA以外はスキップするか、必要に応じて処理
+                        // Console.WriteLine($"Skipping record: {line.Substring(0, Math.Min(2, line.Length))}");
+                    }
+                }
+
+                Console.WriteLine("--------------------------------------------------");
+                Console.WriteLine("【完了】正常に終了しました。");
+            }
         }
-
-        Console.WriteLine("--------------------------------------------------");
-        Console.WriteLine("【完了】正常に終了しました。");
-        // usingブロックを抜ける際にDisposeが呼ばれ、JVCloseが実行されます
+        catch (Exception ex)
+        {
+            Console.WriteLine($"例外エラー: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
     }
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"例外エラー: {ex.Message}");
 }
