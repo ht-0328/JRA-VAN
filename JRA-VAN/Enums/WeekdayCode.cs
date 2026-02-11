@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace JRA_VAN.Shared.Domain.Enums;
+namespace JRA_VAN.Enums;
 
 /// <summary>
 /// 2002.曜日コード
