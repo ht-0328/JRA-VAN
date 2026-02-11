@@ -52,6 +52,15 @@ public static class Program
                     string line = sjis.GetString(rawData);
 
                     // レコード種別 (先頭2文字) を確認
+                    if (line.Length >= 2)
+                    {
+                        Console.WriteLine($"RECORD:{line.Substring(0, 2)}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"RECORD:?? (Len={line.Length})");
+                    }
+
                     if (line.StartsWith("RA"))
                     {
                         // 3. パース処理 (RAレコードの場合)

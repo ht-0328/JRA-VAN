@@ -1,4 +1,6 @@
 using JVDTLabLib;
+using System;
+using System.Linq;
 
 namespace JRA_VAN.Logic;
 
@@ -41,7 +43,7 @@ public class JraVanClient : IDisposable
     /// <summary>
     /// データを1件読み込みます (JVGetsラッパー)
     /// </summary>
-    /// <returns>読み込んだデータのバイト配列。読み込み完了またはエラーの場合はnull。</returns>
+    /// <returns>読み込んだデータのバイト配列。読み込み完了はnull。エラーは例外。</returns>
     public byte[]? Read()
     {
         // バッファをクリア (メモリ破損防止のため推奨)
@@ -51,16 +53,27 @@ public class JraVanClient : IDisposable
         object buffObj = _buffer;
         string fName = "";
 
+        // resultには読み込まれたバイト数が入る (0=EOF, -1=Error, -2=NoData, -3=InsufficientBuffer)
         int result = _jvLink.JVGets(ref buffObj, _buffer.Length, out fName);
 
-        // 0: 完了(EOF), -1: エラー -> どちらも読み込み終了とみなす
-        if (result == 0 || result == -1)
+        if (result == 0)
         {
-            return null;
+            return null; // EOF
+        }
+
+        if (result < 0)
+        {
+            // エラー時
+            // -1: ファイル読み込みエラー, -3: バッファ不足 (102400あるので通常起きないが)
+            throw new Exception($"JVGets failed with error code: {result}");
         }
 
         // 成功した場合、buffObjにデータが入っている (キャストして返す)
-        return (byte[])buffObj;
+        // buffObjは参照渡しで _buffer を指しているはずだが、念のためキャスト
+        var rawData = (byte[])buffObj;
+
+        // 読み込んだサイズ分だけ切り出して返す
+        return rawData.Take(result).ToArray();
     }
 
     /// <summary>
