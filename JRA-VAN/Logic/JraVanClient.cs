@@ -46,34 +46,42 @@ public class JraVanClient : IDisposable
     /// <returns>読み込んだデータのバイト配列。読み込み完了はnull。エラーは例外。</returns>
     public byte[]? Read()
     {
-        // バッファをクリア (メモリ破損防止のため推奨)
-        Array.Clear(_buffer, 0, _buffer.Length);
-
-        // JVGetsの制約: ref object 型で渡す必要がある
-        object buffObj = _buffer;
-        string fName = "";
-
-        // resultには読み込まれたバイト数が入る (0=EOF, -1=Error, -2=NoData, -3=InsufficientBuffer)
-        int result = _jvLink.JVGets(ref buffObj, _buffer.Length, out fName);
-
-        if (result == 0)
+        while (true)
         {
-            return null; // EOF
+            // バッファをクリア (メモリ破損防止のため推奨)
+            Array.Clear(_buffer, 0, _buffer.Length);
+
+            // JVGetsの制約: ref object 型で渡す必要がある
+            object buffObj = _buffer;
+            string fName = "";
+
+            // resultには読み込まれたバイト数が入る (0=EOF, -1=ファイル切替, -2=NoData, -3=InsufficientBuffer)
+            int result = _jvLink.JVGets(ref buffObj, _buffer.Length, out fName);
+
+            if (result == 0)
+            {
+                return null; // EOF
+            }
+
+            if (result == -1)
+            {
+                // ファイル切り替え: 次のデータを読むためにループ継続
+                continue;
+            }
+
+            if (result < 0)
+            {
+                // エラー時
+                // -2: データなし, -3: バッファ不足 (102400あるので通常起きないが)
+                throw new Exception($"JVGets failed with error code: {result}");
+            }
+
+            // 成功した場合、buffObjにデータが入っている (キャストして返す)
+            var rawData = (byte[])buffObj;
+
+            // 読み込んだサイズ分だけ切り出して返す (指定されたため維持)
+            return rawData.Take(result).ToArray();
         }
-
-        if (result < 0)
-        {
-            // エラー時
-            // -1: ファイル読み込みエラー, -3: バッファ不足 (102400あるので通常起きないが)
-            throw new Exception($"JVGets failed with error code: {result}");
-        }
-
-        // 成功した場合、buffObjにデータが入っている (キャストして返す)
-        // buffObjは参照渡しで _buffer を指しているはずだが、念のためキャスト
-        var rawData = (byte[])buffObj;
-
-        // 読み込んだサイズ分だけ切り出して返す
-        return rawData.Take(result).ToArray();
     }
 
     /// <summary>

@@ -47,29 +47,25 @@ public static class Program
                         break;
                     }
 
-                    // バイト配列をShift_JIS文字列に変換
-                    // TrimEndして末尾のゴミを除くことも考慮できるが、固定長パースは位置指定なのでそのまま渡すのが安全
-                    string line = sjis.GetString(rawData);
-
-                    // レコード種別 (先頭2文字) を確認
-                    if (line.Length >= 2)
+                    // 先頭2バイトを見てレコード種別を確認 (Shift_JIS)
+                    // "RA" (0x52, 0x41)
+                    string recordSpec = "";
+                    if (rawData.Length >= 2)
                     {
-                        Console.WriteLine($"RECORD:{line.Substring(0, 2)}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"RECORD:?? (Len={line.Length})");
+                        recordSpec = sjis.GetString(rawData, 0, 2);
                     }
 
-                    if (line.StartsWith("RA"))
+                    Console.WriteLine($"RECORD:{recordSpec}");
+
+                    if (recordSpec == "RA")
                     {
-                        // 3. パース処理 (RAレコードの場合)
+                        // 3. パース処理 (RAレコードの場合) - バイト配列から直接パース
                         try
                         {
-                            RaDto dto = JraVanRecordParser.ParseRa(line);
+                            RaDto dto = JraVanRecordParser.ParseRaFromBytes(rawData);
 
                             // 結果を表示 (例: レース名などを出力)
-                            Console.WriteLine($"[RA] {dto.Year}年{dto.MonthDay} {dto.RacetrackCode} {dto.RaceNum}R: {dto.RaceName.Trim()}");
+                            Console.WriteLine($"[RA] {dto.Year}年{dto.MonthDay} {dto.RacetrackCode} {dto.RaceNum}R: {dto.RaceName}");
                         }
                         catch (Exception parseEx)
                         {
@@ -78,8 +74,8 @@ public static class Program
                     }
                     else
                     {
-                        // RA以外はスキップするか、必要に応じて処理
-                        // Console.WriteLine($"Skipping record: {line.Substring(0, Math.Min(2, line.Length))}");
+                        // RA以外はスキップ
+                        // Console.WriteLine($"Skipping record: {recordSpec}");
                     }
                 }
 
