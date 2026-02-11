@@ -1,5 +1,7 @@
 using System.Text;
+using JRA_VAN.Dtos;
 using JRA_VAN.Models;
+using JRA_VAN.Parsers;
 
 namespace JRA_VAN.Logic;
 
@@ -31,5 +33,15 @@ public static class JraVanRecordParser
         string horseName = Sjis.GetString(data, 37, 36).Trim();
 
         return new RaceRecord(raceDate, raceNum, horseName);
+    }
+
+    /// <summary>
+    /// 文字列からRAレコードをパースします。
+    /// </summary>
+    /// <param name="line">1行文字列</param>
+    /// <returns>パースされたRaDto</returns>
+    public static RaDto ParseRa(string line)
+    {
+        return RaParser.Parse(line);
     }
 }
