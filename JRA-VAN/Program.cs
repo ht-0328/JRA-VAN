@@ -1,4 +1,5 @@
 using System.Text;
+using JRA_VAN.Dtos;
 using JRA_VAN.Logic;
 using JRA_VAN.Models;
 
@@ -30,11 +31,15 @@ try
 
             if (data == null) break; // 読み込み終了またはエラー
 
-            // 3. パース処理 (分離されたロジック)
-            RaceRecord record = JraVanRecordParser.Parse(data);
+            // 3. パース処理 (分離されたロジック) - ジェネリックパーサーを利用
+            RaDto dto = JraVanRecordParser.Parse<RaDto>(data);
 
             // 画面にきれいに表示
-            Console.WriteLine(record.ToString());
+            Console.WriteLine($"開催日: {dto.DataCreationDate} | {dto.RaceNum}R | レース名: {dto.RaceName}");
+            if (dto.PrizeMoney.Count > 0)
+            {
+                Console.WriteLine($"  1着賞金: {dto.PrizeMoney[0]}百円");
+            }
         }
 
         Console.WriteLine("--------------------------------------------------");
