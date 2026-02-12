@@ -11,7 +11,7 @@ public class JraVanClient : IDisposable
     public JraVanClient()
     {
         _jvLink = new JVLink();
-        _buffer = new byte[102400]; // バッファサイズ固定 (制約遵守)
+        _buffer = new byte[10 * 1024 * 1024]; // バッファサイズを10MBに拡張 (JVRead対応)
 
         // 初期化
         // 戻り値が0以外はエラー
@@ -61,6 +61,31 @@ public class JraVanClient : IDisposable
 
         // 成功した場合、buffObjにデータが入っている (キャストして返す)
         return (byte[])buffObj;
+    }
+
+    /// <summary>
+    /// ファイル単位でデータを読み込みます (JVReadラッパー)
+    /// </summary>
+    /// <returns>読み込んだデータのバイト配列。読み込み完了またはエラーの場合はnull。</returns>
+    public byte[]? ReadFile()
+    {
+        object buffObj = _buffer;
+        string fName = "";
+        int size = 0;
+
+        // JVRead呼び出し
+        // 戻り値: 0=正常, -1=EOF(終了), その他=エラー
+        int result = _jvLink.JVRead(ref buffObj, out size, out fName);
+
+        if (result != 0 || size <= 0)
+        {
+            return null;
+        }
+
+        // 有効なデータのみをコピーして返す
+        byte[] data = new byte[size];
+        Array.Copy(_buffer, data, size);
+        return data;
     }
 
     /// <summary>

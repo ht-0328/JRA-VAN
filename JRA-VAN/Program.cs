@@ -21,24 +21,49 @@ try
         // ※ JG1データ（除外・発走除外・競走中止などの馬情報）を取得します
         client.Open("RACE", "20260101000000", 1, out readCount, out downloadCount, out lastTimestamp);
 
-        Console.WriteLine($"読み込み準備完了！ 対象件数: {readCount}件");
+        Console.WriteLine($"読み込み準備完了！ 対象件数: {readCount}件（ファイル数）");
         Console.WriteLine("--------------------------------------------------");
 
-        while (true)
+        var sjis = Encoding.GetEncoding("Shift_JIS");
+
+        for (int i = 0; i < readCount; i++)
         {
-            // 2. データの読み込み (JVGets)
-            byte[]? data = client.Read();
+            // 2. データの読み込み (JVRead)
+            byte[]? fileData = client.ReadFile();
 
-            if (data == null) break; // 読み込み終了またはエラー
+            if (fileData == null) continue;
 
-            // 3. パース処理 (分離されたロジック) - ジェネリックパーサーを利用
-            RaDto dto = JraVanRecordParser.Parse<RaDto>(data);
+            // 3. データを文字列化して行単位で処理
+            string content = sjis.GetString(fileData);
+            // 改行で分割 (CRLF, LF対応)
+            string[] lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            // 画面にきれいに表示
-            Console.WriteLine($"開催日: {dto.DataCreationDate} | {dto.RaceNum}R | レース名: {dto.RaceName}");
-            if (dto.PrizeMoney.Count > 0)
+            foreach (var line in lines)
             {
-                Console.WriteLine($"  1着賞金: {dto.PrizeMoney[0]}百円");
+                // RAレコードのみ対象
+                if (line.StartsWith("RA"))
+                {
+                    // パース処理のためにバイト配列に戻す
+                    // ※JraVanRecordParserはバイト配列を期待するため
+                    byte[] lineBytes = sjis.GetBytes(line);
+
+                    try
+                    {
+                        // 4. パース処理
+                        RaDto dto = JraVanRecordParser.Parse<RaDto>(lineBytes);
+
+                        // 画面にきれいに表示
+                        Console.WriteLine($"開催日: {dto.DataCreationDate} | {dto.RaceNum}R | レース名: {dto.RaceName}");
+                        if (dto.PrizeMoney.Count > 0)
+                        {
+                            Console.WriteLine($"  1着賞金: {dto.PrizeMoney[0]}百円");
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // パースエラーはスキップ（不正なデータや短い行など）
+                    }
+                }
             }
         }
 
